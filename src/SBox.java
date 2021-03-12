@@ -14,7 +14,7 @@ public class SBox {
     private static final List<boolean[]> coordinateFunction = new ArrayList<>();
     private static final int[] functionWeight = new int[6];
     private static final List<boolean[]> ZhegalkinPolynomial = new ArrayList<>();
-    private static final List<boolean[]> dummyVariables = new ArrayList<>();//true if variable is dummy
+    private static final List<boolean[]> dummyVariables = new ArrayList<>();
 
     static {
         for (int i = 0; i < 6; i++) {
