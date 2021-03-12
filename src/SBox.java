@@ -38,8 +38,6 @@ public class SBox {
         for (int i = 0; i < 6; i++)
             ZhegalkinPolynomial.add(triangleMethod(coordinateFunction.get(i)));
 
-        boolean[] allTrue = new boolean[6];
-        Arrays.fill(allTrue, true);
         for (int i = 0; i < 6; i++) {
             boolean[] f = ZhegalkinPolynomial.get(i);
             for (int j = 0; j < f.length; j++) {
