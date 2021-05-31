@@ -24,6 +24,15 @@ public class SBox {
     private static String path = "";
     private static boolean prohibitionFound = false;
 
+    private static final int[][] statStructure = new int[6][64];
+    private static final int[][] fourierWithoutDivision = new int[6][64];
+    private static final double[][] fourier = new double[6][64];
+    private static final int[] bestLinearApproximation = new int[6];
+    private static final int[] correlationImmunityOrders = new int[6];
+    private static final int[] leastVariableApproximation = new int[6];
+    private static final double[][][] linearCharacteristics = new double[6][64][64];
+    private static final double[][][] diffCharacteristics = new double[6][64][64];
+
     static {
         for (int i = 0; i < 6; i++) {
             coordinateFunction.add(new boolean[64]);
@@ -65,6 +74,15 @@ public class SBox {
                 }
             }
         }
+
+        fourierWithoutDivision();
+        fourier();
+        statStructureCoefficients();
+        countBestLinearApproximation();
+        correlationImmunityOrder();
+        countLeastVariableApproximation();
+        countLinearCharacteristic();
+        countDiffCharacteristic();
     }
 
     private static boolean[] triangleMethod(boolean[] line) {
@@ -85,6 +103,142 @@ public class SBox {
         }
 
         return result;
+    }
+
+    private static void fourierWithoutDivision() {
+        for (int i = 0; i < 6; i++) {
+            int[] tmp = new int[64];
+            for (int j = 0; j < 64; j++) {
+                tmp[j] = coordinateFunction.get(i)[j] ? 1 : 0;
+            }
+            int vectorLength = 1;
+            while (vectorLength < 64) {
+                int[] firstVector = new int[vectorLength];
+                int[] secondVector = new int[vectorLength];
+                for (int j = 0; j < 64; j += vectorLength * 2) {
+                    System.arraycopy(tmp, j, firstVector, 0, vectorLength);
+                    System.arraycopy(tmp, j + vectorLength, secondVector, 0, vectorLength);
+                    System.arraycopy(IntStream.range(0, vectorLength).map(k -> firstVector[k] + secondVector[k]).toArray(), 0, tmp, j, vectorLength);
+                    System.arraycopy(IntStream.range(0, vectorLength).map(k -> firstVector[k] - secondVector[k]).toArray(), 0, tmp, j + vectorLength, vectorLength);
+                }
+                vectorLength *= 2;
+            }
+            fourierWithoutDivision[i] = tmp;
+        }
+    }
+
+    private static void fourier() {
+        for (int i = 0; i < 6; i++) {
+            for (int j = 0; j < 64; j++) {
+                fourier[i][j] = (double) fourierWithoutDivision[i][j] / 64;
+            }
+        }
+    }
+
+    private static void statStructureCoefficients() {
+        for (int i = 0; i < 6; i++) {
+            for (int j = 0; j < 64; j++) {
+                if (j == 0) {
+                    statStructure[i][j] = 32 - fourierWithoutDivision[i][j];
+                } else {
+                    statStructure[i][j] = -fourierWithoutDivision[i][j];
+                }
+            }
+        }
+    }
+
+    private static void countBestLinearApproximation() {
+        for (int i = 0; i < 6; i++) {
+            int approximation = 0;
+            int max = 0;
+            for (int j = 0; j < 64; j++) {
+                if (Math.abs(statStructure[i][j]) > Math.abs(max)) {
+                    approximation = j;
+                    max = statStructure[i][j];
+                }
+            }
+            bestLinearApproximation[i] = max >= 0 ? approximation : -approximation;
+        }
+    }
+
+    private static void correlationImmunityOrder() {
+        for (int i = 0; i < 6; i++) {
+            int order = 1;
+            boolean orderFound = false;
+            while (order <= 6) {
+                for (int j = 0; j < 64; j++) {
+                    if (Integer.toBinaryString(j).chars().filter(c -> c == '1').count() == order) {
+                        if (fourier[i][j] != 0) {
+                            orderFound = true;
+                            break;
+                        }
+                    }
+                }
+                if (orderFound) {
+                    break;
+                }
+                order++;
+            }
+            correlationImmunityOrders[i] = order - 1;
+        }
+    }
+
+    private static void countLeastVariableApproximation() {
+        for (int i = 0; i < 6; i++) {
+            int max = 0;
+            int approximation = 0;
+            for (int j = 0; j < 64; j++) {
+                if (Integer.toBinaryString(j).chars().filter(c -> c == '1').count() == correlationImmunityOrders[i] + 1) {
+                    if (Math.abs(statStructure[i][j]) > Math.abs(max)) {
+                        max = statStructure[i][j];
+                        approximation = j;
+                    }
+                }
+            }
+            leastVariableApproximation[i] = max >= 0 ? approximation : -approximation;
+        }
+    }
+
+    private static void countLinearCharacteristic() {
+        for (int i = 0; i < 6; i++) {
+            for (int a = 0; a < 64; a++) {
+                for (int b = 0; b < 64; b++) {
+                    for (int x = 0; x < 64; x++) {
+                        if ((scalar(x, a) ^ scalar(sBox[x], b)) == 0) {
+                            linearCharacteristics[i][a][b]++;
+                        }
+                    }
+                }
+            }
+            for (int j = 0; j < 64; j++) {
+                for (int k = 0; k < 64; k++) {
+                    linearCharacteristics[i][j][k] /= 64;
+                }
+            }
+        }
+    }
+
+    private static int scalar(int v1, int v2) {
+        return Integer.bitCount(v1 & v2) % 2;
+    }
+
+    private static void countDiffCharacteristic() {
+        for (int i = 0; i < 6; i++) {
+            for (int a = 0; a < 64; a++) {
+                for (int b = 0; b < 64; b++) {
+                    for (int x = 0; x < 64; x++) {
+                        if ((sBox[x] ^ sBox[x ^ a]) == b) {
+                            diffCharacteristics[i][a][b]++;
+                        }
+                    }
+                }
+            }
+            for (int j = 0; j < 64; j++) {
+                for (int k = 0; k < 64; k++) {
+                    diffCharacteristics[i][j][k] /= 64;
+                }
+            }
+        }
     }
 
     @Override
@@ -144,10 +298,40 @@ public class SBox {
         }
 
         findProhibitionOfSBox(new HashSet<>(Arrays.stream(IntStream.range(0, 64).toArray())
-                .boxed()
-                .collect(Collectors.toList())),
+                        .boxed()
+                        .collect(Collectors.toList())),
                 7, path);
         result.append("Запрет S-box'а: ").append(path.substring(1)).append("\n");
+
+        for (int i = 0; i < 6; i++) {
+            result.append("Коэффициенты статистической структуры для f").append(i).append(": ").append(Arrays.toString(statStructure[i])).append("\n");
+        }
+
+        for (int i = 0; i < 6; i++) {
+            result.append("Наилучшее приближение f").append(i).append(": ").append(bestLinearApproximation[i]).append("\n");
+        }
+
+        for (int i = 0; i < 6; i++) {
+            result.append("Порядок корреляционной имунности f").append(i).append(": ").append(correlationImmunityOrders[i]).append("\n");
+        }
+
+        for (int i = 0; i < 6; i++) {
+            result.append("Best least approximation f").append(i).append(": ").append(leastVariableApproximation[i]).append("\n");
+        }
+
+        for (int i = 0; i < 6; i++) {
+            result.append("Linear characteristics f").append(i).append(":\n");
+            for (int j = 0; j < 64; j++) {
+                result.append(Arrays.toString(linearCharacteristics[i][j])).append("\n");
+            }
+        }
+
+        for (int i = 0; i < 6; i++) {
+            result.append("Difference characteristics f").append(i).append(":\n");
+            for (int j = 0; j < 64; j++) {
+                result.append(Arrays.toString(diffCharacteristics[i][j])).append("\n");
+            }
+        }
 
         return result.toString();
     }
