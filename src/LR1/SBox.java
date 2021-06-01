@@ -30,8 +30,8 @@ public class SBox {
     private static final int[] bestLinearApproximation = new int[6];
     private static final int[] correlationImmunityOrders = new int[6];
     private static final int[] leastVariableApproximation = new int[6];
-    private static final double[][][] linearCharacteristics = new double[6][64][64];
-    private static final double[][][] diffCharacteristics = new double[6][64][64];
+    private static final int[][][] linearCharacteristicsWithoutDivision = new int[6][64][64];
+    private static final int[][][] diffCharacteristicsWithoutDivision = new int[6][64][64];
 
     static {
         for (int i = 0; i < 6; i++) {
@@ -205,14 +205,9 @@ public class SBox {
                 for (int b = 0; b < 64; b++) {
                     for (int x = 0; x < 64; x++) {
                         if ((scalar(x, a) ^ scalar(sBox[x], b)) == 0) {
-                            linearCharacteristics[i][a][b]++;
+                            linearCharacteristicsWithoutDivision[i][a][b]++;
                         }
                     }
-                }
-            }
-            for (int j = 0; j < 64; j++) {
-                for (int k = 0; k < 64; k++) {
-                    linearCharacteristics[i][j][k] /= 64;
                 }
             }
         }
@@ -228,14 +223,9 @@ public class SBox {
                 for (int b = 0; b < 64; b++) {
                     for (int x = 0; x < 64; x++) {
                         if ((sBox[x] ^ sBox[x ^ a]) == b) {
-                            diffCharacteristics[i][a][b]++;
+                            diffCharacteristicsWithoutDivision[i][a][b]++;
                         }
                     }
-                }
-            }
-            for (int j = 0; j < 64; j++) {
-                for (int k = 0; k < 64; k++) {
-                    diffCharacteristics[i][j][k] /= 64;
                 }
             }
         }
@@ -243,12 +233,12 @@ public class SBox {
 
     @Override
     public String toString() {
-        StringBuilder result = new StringBuilder("    f1 f2 f3 f4 f5 f6\n");
+        StringBuilder result = new StringBuilder();
 
-        for (int i = 0; i < 64; i++) {
-            result.append(String.format("%2d: ", sBox[i]));
-            for (int j = 0; j < 6; j++) {
-                result.append((coordinateFunction.get(j)[i] ? "1" : "0")).append("  ");
+        for (int i = 0; i < 6; i++) {
+            result.append("f").append(i).append(": ");
+            for (int j = 0; j < 64; j++) {
+                result.append(coordinateFunction.get(i)[j] ? "1" : "0");
             }
             result.append("\n");
         }
@@ -256,14 +246,14 @@ public class SBox {
         result.append("\n");
 
         for (int i = 0; i < 6; i++) {
-            result.append("f").append(i + 1).append(" weight: ").append(functionWeight[i]).append("\n");
+            result.append("f").append(i).append(" weight: ").append(functionWeight[i]).append("\n");
         }
 
         result.append("\n");
 
         result.append("Zhegalkin Polynomials:\n");
         for (int i = 0; i < 6; i++) {
-            result.append("f").append(i + 1).append(": ").append(zhegalkinPolynomialToString(ZhegalkinPolynomial.get(i))).append("\n");
+            result.append("f").append(i).append(": ").append(zhegalkinPolynomialToString(ZhegalkinPolynomial.get(i))).append("\n");
         }
 
         result.append("\n");
@@ -274,7 +264,7 @@ public class SBox {
             StringBuilder a = new StringBuilder();
             for (int j = 0; j < 6; j++) {
                 if (dummyVariables.get(i)[j]) {
-                    a.append("x").append(j + 1).append(", ");
+                    a.append("x").append(j).append(", ");
                 }
             }
             if (a.length() != 0) {
@@ -291,7 +281,7 @@ public class SBox {
                             .boxed()
                             .collect(Collectors.toList())),
                     coordinateFunction.get(i), 7, path);
-            result.append("Запрет для f").append(i).append(": ").append(path.substring(1)).append("\n");
+            result.append("Ban for f").append(i).append(": ").append(path.substring(1)).append("\n");
             path = "";
             prevNodes = new ArrayList<>();
             prohibitionFound = false;
@@ -301,18 +291,22 @@ public class SBox {
                         .boxed()
                         .collect(Collectors.toList())),
                 7, path);
-        result.append("Запрет S-box'а: ").append(path.substring(1)).append("\n");
+        result.append("Ban of S-box: ").append(path.substring(1)).append("\n");
 
         for (int i = 0; i < 6; i++) {
-            result.append("Коэффициенты статистической структуры для f").append(i).append(": ").append(Arrays.toString(statStructure[i])).append("\n");
+            result.append("Fourier for f").append(i).append(": ").append(Arrays.toString(fourierWithoutDivision[i])).append("\n");
         }
 
         for (int i = 0; i < 6; i++) {
-            result.append("Наилучшее приближение f").append(i).append(": ").append(bestLinearApproximation[i]).append("\n");
+            result.append("Static struct coefficient f").append(i).append(": ").append(Arrays.toString(statStructure[i])).append("\n");
         }
 
         for (int i = 0; i < 6; i++) {
-            result.append("Порядок корреляционной имунности f").append(i).append(": ").append(correlationImmunityOrders[i]).append("\n");
+            result.append("Best linear approximation f").append(i).append(": ").append(bestLinearApproximation[i]).append("\n");
+        }
+
+        for (int i = 0; i < 6; i++) {
+            result.append("Order of correlation immunity f").append(i).append(": ").append(correlationImmunityOrders[i]).append("\n");
         }
 
         for (int i = 0; i < 6; i++) {
@@ -322,14 +316,14 @@ public class SBox {
         for (int i = 0; i < 6; i++) {
             result.append("Linear characteristics f").append(i).append(":\n");
             for (int j = 0; j < 64; j++) {
-                result.append(Arrays.toString(linearCharacteristics[i][j])).append("\n");
+                result.append(Arrays.toString(linearCharacteristicsWithoutDivision[i][j])).append("\n");
             }
         }
 
         for (int i = 0; i < 6; i++) {
             result.append("Difference characteristics f").append(i).append(":\n");
             for (int j = 0; j < 64; j++) {
-                result.append(Arrays.toString(diffCharacteristics[i][j])).append("\n");
+                result.append(Arrays.toString(diffCharacteristicsWithoutDivision[i][j])).append("\n");
             }
         }
 
